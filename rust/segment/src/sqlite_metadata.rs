@@ -651,13 +651,6 @@ impl SqliteMetadataReader {
 
             if document || metadata {
                 if let Ok(key) = row.try_get::<String, _>(2) {
-                    if let (true, Ok(doc)) = (
-                        document && key.starts_with(CHROMA_DOCUMENT_KEY),
-                        row.try_get(3),
-                    ) {
-                        record.document = Some(doc);
-                    }
-
                     if let Some(metadata) = record.metadata.as_mut() {
                         if let Ok(Some(s)) = row.try_get(3) {
                             metadata.insert(key.clone(), MetadataValue::Str(s));
@@ -676,12 +669,16 @@ impl SqliteMetadataReader {
         Ok(GetResult {
             records: records
                 .into_values()
-                .map(|mut rec| match rec.metadata {
-                    Some(meta) if meta.is_empty() => {
-                        rec.metadata = None;
-                        rec
+                .map(|mut rec| {
+                    if let Some(mut meta) = rec.metadata.take() {
+                        if let Some(MetadataValue::Str(doc)) = meta.remove(CHROMA_DOCUMENT_KEY) {
+                            rec.document = Some(doc);
+                        }
+                        if !meta.is_empty() {
+                            rec.metadata = Some(meta)
+                        }
                     }
-                    _ => rec,
+                    rec
                 })
                 .collect(),
         })
