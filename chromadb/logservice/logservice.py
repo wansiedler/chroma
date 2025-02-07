@@ -157,6 +157,7 @@ class LogService(Producer, Consumer):
     @property
     @override
     def max_batch_size(self) -> int:
+        print("<<<< log service >>>> Max batch size: 100")
         return 100
 
     def push_logs(self, collection_id: UUID, records: Sequence[OperationRecord]) -> int:

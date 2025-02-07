@@ -194,6 +194,7 @@ def test_add_large(
         metadatas=cast(Metadatas, record_set["metadatas"]),
         documents=cast(List[str], record_set["documents"]),
     ):
+        print(f"Adding batch of size {len(batch)}")
         coll.add(*batch)
 
     if (
@@ -229,7 +230,7 @@ def test_add_large_exceeding(
 
     with pytest.raises(Exception) as e:
         coll.add(**record_set)  # type: ignore[arg-type]
-    assert "exceeds maximum batch size" in str(e.value)
+    assert "is greater than max batch size" in str(e.value)
 
 
 # TODO: This test fails right now because the ids are not sorted by the input order
