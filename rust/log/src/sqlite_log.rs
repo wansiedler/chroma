@@ -60,6 +60,8 @@ impl ChromaError for SqlitePushLogsError {
     }
 }
 
+const VARIABLE_PER_RECORD: u32 = 6;
+
 #[derive(Error, Debug)]
 pub enum SqliteGetCollectionsWithNewDataError {
     #[error("Query error: {0}")]
@@ -384,7 +386,7 @@ impl SqliteLog {
             .fetch_all(self.db.get_conn())
             .await
             .map_err(WrappedSqlxError)?;
-        let mut max_variable_number = 100;
+        let mut max_variable_number = 999;
         for row in rows {
             let row_parsed = row.try_get::<String, _>(0)?;
             if row_parsed.starts_with("MAX_VARIABLE_NUMBER") {
@@ -394,7 +396,7 @@ impl SqliteLog {
                 }
             }
         }
-        Ok(max_variable_number)
+        Ok(max_variable_number / VARIABLE_PER_RECORD)
     }
 }
 
