@@ -18,7 +18,6 @@ def create_batches(
     _batches: List[
         Tuple[IDs, Embeddings, Optional[Metadatas], Optional[Documents]]
     ] = []
-    print(f"Max batch size: {api.get_max_batch_size()}")
     if len(ids) > api.get_max_batch_size():
         # create split batches
         for i in range(0, len(ids), api.get_max_batch_size()):
