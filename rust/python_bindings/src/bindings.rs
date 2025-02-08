@@ -17,13 +17,12 @@ use chroma_system::System;
 use chroma_types::{
     AddCollectionRecordsError, Collection, CreateCollectionRequest, CreateDatabaseRequest,
     CreateTenantRequest, Database, DeleteCollectionRecordsResponse, DeleteDatabaseRequest,
-    GetCollectionError, GetDatabaseRequest, GetResponse, GetResponse, GetTenantRequest,
-    GetTenantResponse, HeartbeatError, IncludeList, IncludeList, ListDatabasesRequest, Metadata,
-    Metadata, QueryError, QueryResponse, QueryResponse, UpdateCollectionRecordsError,
-    UpdateMetadata, UpdateMetadata, UpsertCollectionRecordsError,
+    GetCollectionError, GetDatabaseRequest, GetResponse, GetTenantRequest, GetTenantResponse,
+    HeartbeatError, IncludeList, ListDatabasesRequest, Metadata, QueryResponse,
+    UpdateCollectionRecordsError, UpdateMetadata, UpsertCollectionRecordsError,
 };
 use numpy::PyReadonlyArray1;
-use pyo3::{pyclass, pymethods, PyObject, PyResult, Python};
+use pyo3::{exceptions::PyValueError, pyclass, pymethods, PyObject, PyResult, Python};
 use std::time::SystemTime;
 
 const DEFAULT_DATABASE: &str = "default_database";
@@ -134,15 +133,7 @@ impl Bindings {
             sqlite_db,
             handle.clone(),
         ));
-        let max_batch_size = match runtime.block_on(log.get_max_batch_size()) {
-            Ok(max_batch_size) => max_batch_size,
-            Err(e) => {
-                return Err(PyOSError::new_err(format!(
-                    "Failed to get max batch size: {}",
-                    e
-                )))
-            }
-        };
+        let max_batch_size = runtime.block_on(log.get_max_batch_size())?;
         let frontend = Frontend::new(
             false,
             sysdb.clone(),
@@ -171,7 +162,7 @@ impl Bindings {
 
     #[allow(dead_code)]
     fn get_max_batch_size(&self) -> u32 {
-        self._frontend.clone().get_max_batch_size()
+        self.frontend.clone().get_max_batch_size()
     }
 
     // TODO(hammadb): Determine our pattern for optional arguments in python
@@ -316,14 +307,15 @@ impl Bindings {
         tenant: String,
         database: String,
     ) -> ChromaPyResult<bool> {
-        let mut frontend_clone = self._frontend.clone();
+        let mut frontend_clone = self.frontend.clone();
 
         if self.get_max_batch_size() < ids.len() as u32 {
-            return Err(PyValueError::new_err(format!(
+            return Err(WrappedPyErr::from(PyValueError::new_err(format!(
                 "Batch size of {} is greater than max batch size of {}",
                 ids.len(),
                 self.get_max_batch_size()
-            )));
+            )))
+            .into());
         }
         // TODO: move validate embeddings into this conversion
         // let embeddings = py_embeddings_to_vec_f32(embeddings)?;
@@ -470,19 +462,16 @@ impl Bindings {
         where_document: Option<String>,
         tenant: String,
         database: String,
-    ) -> PyResult<()> {
+    ) -> ChromaPyResult<()> {
         // TODO: Rethink the error handling strategy
         let r#where = chroma_types::RawWhereFields::from_json_str(
             r#where.as_deref(),
             where_document.as_deref(),
-        )
-        .map_err(|e| PyValueError::new_err(e.to_string()))?
-        .parse()
-        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        )?
+        .parse()?;
 
         let collection_id = chroma_types::CollectionUuid(
-            uuid::Uuid::parse_str(&collection_id)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+            uuid::Uuid::parse_str(&collection_id).map_err(WrappedUuidError)?,
         );
 
         let request = chroma_types::DeleteCollectionRecordsRequest::try_new(
@@ -491,13 +480,11 @@ impl Bindings {
             collection_id,
             ids,
             r#where,
-        )
-        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        )?;
 
-        let mut frontend_clone = self._frontend.clone();
-        self._runtime
-            .block_on(async { frontend_clone.delete(request).await })
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let mut frontend_clone = self.frontend.clone();
+        self.runtime
+            .block_on(async { frontend_clone.delete(request).await })?;
         Ok(())
     }
 
@@ -515,8 +502,8 @@ impl Bindings {
         uris: Option<Vec<Option<String>>>,
         tenant: String,
         database: String,
-    ) -> PyResult<bool> {
-        let mut frontend_clone = self._frontend.clone();
+    ) -> ChromaPyResult<bool> {
+        let mut frontend_clone = self.frontend.clone();
 
         // let embeddings = match embeddings {
         //     Some(embeddings) => py_embeddings_to_opt_vec_f32(Some(embeddings))?,
@@ -524,26 +511,14 @@ impl Bindings {
         // };
 
         let collection_id = chroma_types::CollectionUuid(
-            uuid::Uuid::parse_str(&collection_id)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+            uuid::Uuid::parse_str(&collection_id).map_err(WrappedUuidError)?,
         );
 
-        let res = self._runtime.block_on(async {
+        let res = self.runtime.block_on(async {
             frontend_clone
                 .validate_embedding(collection_id, embeddings.as_ref(), false, |e| Some(e.len()))
                 .await
-        });
-
-        // TODO: error handling
-        match res {
-            Ok(_) => (),
-            Err(e) => {
-                return Err(PyRuntimeError::new_err(format!(
-                    "Failed to validate embeddings: {}",
-                    e
-                )))
-            }
-        }
+        })?;
 
         let req = chroma_types::UpsertCollectionRecordsRequest::try_new(
             tenant,
@@ -554,21 +529,11 @@ impl Bindings {
             documents,
             uris,
             metadatas,
-        )
-        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        )?;
 
-        match self
-            ._runtime
-            .block_on(async { frontend_clone.upsert(req).await })
-        {
-            Ok(_) => Ok(true),
-            Err(e) => match e {
-                // TODO: How come this cannot throw collection not found?
-                UpsertCollectionRecordsError::Internal(e) => {
-                    Err(PyRuntimeError::new_err(format!("Internal Error: {}", e)))
-                }
-            },
-        }
+        self.runtime
+            .block_on(async { frontend_clone.upsert(req).await })?;
+        Ok(true)
     }
 
     #[pyo3(
