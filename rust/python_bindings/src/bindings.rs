@@ -313,7 +313,6 @@ impl Bindings {
         tenant: String,
         database: String,
     ) -> ChromaPyResult<bool> {
-        println!("(Sanket-temp) Batch size of add {:?}", ids.len());
         let mut frontend_clone = self._frontend.clone();
 
         if self.get_max_batch_size() < ids.len() as u32 {

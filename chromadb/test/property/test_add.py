@@ -194,7 +194,6 @@ def test_add_large(
         metadatas=cast(Metadatas, record_set["metadatas"]),
         documents=cast(List[str], record_set["documents"]),
     ):
-        print(f"Adding batch of size {len(batch)}")
         coll.add(*batch)
 
     if (
