@@ -36,7 +36,7 @@ impl ChromaError for SqlitePullLogsError {
 
 #[derive(Error, Debug)]
 pub enum SqlitePushLogsError {
-    #[error("Error in compaction")]
+    #[error("Error in compaction {0}")]
     CompactionError(#[from] CompactionManagerError),
     #[error("Error setting compactor handle")]
     CompactorHandleSetError,
@@ -214,6 +214,7 @@ impl SqliteLog {
                 metadata_str
                     .map(|metadata_str| {
                         let mut parsed: UpdateMetadata = serde_json::from_str(metadata_str)?;
+                        println!("(Sanket-temp) Pull logs metadata: {:?}", parsed);
 
                         let document = match parsed.remove("chroma:document") {
                             Some(UpdateMetadataValue::Str(document)) => Some(document),
@@ -277,8 +278,10 @@ impl SqliteLog {
                         UpdateMetadataValue::Str(document.clone()),
                     );
                 }
+                println!("(Sanket-temp) metadata: {:?}", metadata);
 
                 let serialized = serde_json::to_string(&metadata)?;
+                println!("(Sanket-temp) serialized metadata: {:?}", serialized);
                 Ok::<_, SqlitePushLogsError>((record, serialized))
             })
             .collect::<Result<Vec<(OperationRecord, String)>, SqlitePushLogsError>>()?;

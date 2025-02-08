@@ -77,6 +77,7 @@ impl LocalExecutor {
     }
 
     pub async fn get(&mut self, plan: Get) -> Result<GetResult, ExecutorError> {
+        // println!(">>>>>>>>get plan: {:?}<<<<<<<", plan);
         let collection_and_segments = plan.scan.collection_and_segments.clone();
         self.try_backfill_collection(&collection_and_segments)
             .await?;
@@ -114,7 +115,7 @@ impl LocalExecutor {
         self.try_backfill_collection(&collection_and_segments)
             .await?;
         if let Some(dimensionality) = collection_and_segments.collection.dimension {
-            let allowed_user_ids = if plan.filter.where_clause.is_none() {
+            let allowed_user_ids: Vec<String> = if plan.filter.where_clause.is_none() {
                 plan.filter.query_ids.unwrap_or_default()
             } else {
                 let filter_plan = Get {

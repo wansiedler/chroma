@@ -55,6 +55,9 @@ fn to_records<
     metadatas: Option<Vec<Option<M>>>,
     operation: Operation,
 ) -> Result<Vec<OperationRecord>, ToRecordsError> {
+    // println!(">>>>>>Metadatas {:?}<<<<<<", metadatas);
+    println!(">>>>>>Documents {:?}<<<<<<", documents);
+    println!(">>>>>>IDs {:?}<<<<<<", ids);
     let len = ids.len();
 
     // Check that every present vector has the same length as `ids`.
@@ -106,6 +109,11 @@ fn to_records<
             metadata: Some(metadata),
             operation,
         });
+    }
+    for record in records.iter() {
+        println!(">>>>>>Id {:?}<<<<<<>>>>>>", record.id);
+        println!(">>>>>>Document {:?}<<<<<<", record.document);
+        println!(">>>>>>Metadata {:?}<<<<<<", record.metadata);
     }
 
     Ok(records)

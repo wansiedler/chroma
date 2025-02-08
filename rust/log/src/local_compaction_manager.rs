@@ -137,10 +137,10 @@ impl Handler<CompactionMessage> for LocalCompactionManager {
             .sysdb
             .get_collection_with_segments(message.collection_id)
             .await?;
-        let collection_dimension = collection_segments
-            .collection
-            .dimension
-            .ok_or(CompactionManagerError::CollectionUninitialized)?;
+        let collection_dimension = match collection_segments.collection.dimension {
+            Some(dim) => dim as usize,
+            None => return Ok(()),
+        };
         let metadata_writer = SqliteMetadataWriter::new(self.sqlite_db.clone());
         // Apply the records to the metadata writer.
         let mut tx = metadata_writer

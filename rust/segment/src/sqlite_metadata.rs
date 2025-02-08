@@ -304,6 +304,7 @@ impl SqliteMetadataWriter {
             _,
         ) in logs.iter()
         {
+            println!("Document in apply {:?}", document);
             let log_offset_unsigned = (*log_offset).try_into()?;
             max_seq_id = max_seq_id.max(log_offset_unsigned);
             let mut metadata_owned = metadata.clone();
@@ -636,23 +637,29 @@ impl SqliteMetadataReader {
         let rows = sqlx::query_with(&sql, values)
             .fetch_all(self.db.get_conn())
             .await?;
+        // println!("<<<<<<Got {:?} rows>>>>>>", rows.len());
 
         let mut records = BTreeMap::new();
 
         for row in rows {
+            // println!("r<<<<Inside row>>>>>>");
             let offset_id: u32 = row.try_get(0)?;
             let user_id: String = row.try_get(1)?;
             let record = records.entry(offset_id).or_insert(ProjectionRecord {
                 id: user_id,
                 document: None,
                 embedding: None,
-                metadata: metadata.then_some(HashMap::new()),
+                metadata: (document || metadata).then_some(HashMap::new()),
             });
+            // println!("r<<<<Record {:?}>>>>>>", record);
 
             if document || metadata {
                 if let Ok(key) = row.try_get::<String, _>(2) {
+                    println!("r<<<<Metadata key {:?}>>>>>>", key);
                     if let Some(metadata) = record.metadata.as_mut() {
+                        // println!("r<<<<Metadata {:?}>>>>>>", metadata);
                         if let Ok(Some(s)) = row.try_get(3) {
+                            println!("r<<<<String value {:?}>>>>>>", s);
                             metadata.insert(key.clone(), MetadataValue::Str(s));
                         } else if let Ok(Some(i)) = row.try_get(4) {
                             metadata.insert(key.clone(), MetadataValue::Int(i));
@@ -661,9 +668,11 @@ impl SqliteMetadataReader {
                         } else if let Ok(Some(b)) = row.try_get(6) {
                             metadata.insert(key, MetadataValue::Bool(b));
                         }
+                        println!("r<<<<Metadata {:?}>>>>>>", metadata);
                     }
                 }
             }
+            println!("r<<<<Record before {:?}>>>>>>", record);
         }
 
         Ok(GetResult {
@@ -671,6 +680,7 @@ impl SqliteMetadataReader {
                 .into_values()
                 .map(|mut rec| {
                     if let Some(mut meta) = rec.metadata.take() {
+                        // println!(">>>>>>>meta: {meta:?}<<<<<<<<<<");
                         if let Some(MetadataValue::Str(doc)) = meta.remove(CHROMA_DOCUMENT_KEY) {
                             rec.document = Some(doc);
                         }
@@ -678,6 +688,7 @@ impl SqliteMetadataReader {
                             rec.metadata = Some(meta)
                         }
                     }
+                    println!("r<<<<Record after extracting document {:?}>>>>>>", rec);
                     rec
                 })
                 .collect(),

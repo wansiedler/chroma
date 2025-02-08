@@ -117,6 +117,7 @@ def _field_matches(
     field_name: one of [documents, metadatas]
     """
     result = collection.get(ids=normalized_record_set["ids"], include=[field_name])  # type: ignore[list-item]
+    # print(f">>>>>>>Field: {field_name}, result: {result[field_name]}<<<<<<<<")
     # The test_out_of_order_ids test fails because of this in test_add.py
     # Here we sort by the ids to match the input order
     embedding_id_to_index = {id: i for i, id in enumerate(normalized_record_set["ids"])}
@@ -148,17 +149,18 @@ def _field_matches(
     if field_name == "embeddings":
         assert np.allclose(np.array(field_values), np.array(expected_field))
     else:
-        print(f">>>>>>>Field: {field_values}, expected: {expected_field}<<<<<<<<")
+        # print(f">>>>>>>Field: {field_values}, expected: {expected_field}<<<<<<<<")
         assert len(field_values) == len(expected_field)
 
-        for field_value, expected_field in zip(field_values, expected_field):
+        for i, (field_value, expected_field) in enumerate(zip(field_values, expected_field)):
             if isinstance(expected_field, dict):
                 check_metadata(
                     cast(types.Metadata, field_value),
                     cast(types.Metadata, expected_field),
                 )
             else:
-                print(f">>>>>>Field: {field_value}, expected: {expected_field}<<<<")
+                print(f">>>>>Field: {field_value}, expected: {expected_field}<<<<")
+                # print(result["ids"][i])
                 assert field_value == expected_field
 
 

@@ -107,6 +107,7 @@ where
     for (key, value) in metadata {
         match (&value).try_into() {
             Ok(val) => {
+                println!("updating metadata: {key} = {val:?}");
                 metadata_not_null.insert(key, val);
             }
             Err(_) => deleted_keys.push(key),
