@@ -148,6 +148,7 @@ def _field_matches(
     if field_name == "embeddings":
         assert np.allclose(np.array(field_values), np.array(expected_field))
     else:
+        print(f">>>>>>>Field: {field_values}, expected: {expected_field}<<<<<<<<")
         assert len(field_values) == len(expected_field)
 
         for field_value, expected_field in zip(field_values, expected_field):
@@ -157,6 +158,7 @@ def _field_matches(
                     cast(types.Metadata, expected_field),
                 )
             else:
+                print(f">>>>>>Field: {field_value}, expected: {expected_field}<<<<")
                 assert field_value == expected_field
 
 

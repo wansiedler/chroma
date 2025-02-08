@@ -336,19 +336,19 @@ class RustBindingsAPI(ServerAPI):
         tenant: str = DEFAULT_TENANT,
         database: str = DEFAULT_DATABASE,
     ) -> bool:
-        # return self.bindings.update(
-        #     str(collection_id),
-        #     ids,
-        #     embeddings,
-        #     metadatas,
-        #     documents,
-        #     uris,
-        #     tenant,
-        #     database,
-        # )
-        return self.proxy_segment_api._update(
-            collection_id, ids, embeddings, metadatas, documents, uris, tenant, database
+        return self.bindings.update(
+            str(collection_id),
+            ids,
+            embeddings,
+            metadatas,
+            documents,
+            uris,
+            tenant,
+            database,
         )
+        # return self.proxy_segment_api._update(
+        #     collection_id, ids, embeddings, metadatas, documents, uris, tenant, database
+        # )
 
     @override
     def _upsert(
@@ -362,9 +362,19 @@ class RustBindingsAPI(ServerAPI):
         tenant: str = DEFAULT_TENANT,
         database: str = DEFAULT_DATABASE,
     ) -> bool:
-        return self.proxy_segment_api._upsert(
-            collection_id, ids, embeddings, metadatas, documents, uris, tenant, database
+        return self.bindings.upsert(
+            str(collection_id),
+            ids,
+            embeddings,
+            metadatas,
+            documents,
+            uris,
+            tenant,
+            database,
         )
+        # return self.proxy_segment_api._upsert(
+        #     collection_id, ids, embeddings, metadatas, documents, uris, tenant, database
+        # )
 
     @override
     def _query(
@@ -421,9 +431,17 @@ class RustBindingsAPI(ServerAPI):
         tenant: str = DEFAULT_TENANT,
         database: str = DEFAULT_DATABASE,
     ) -> None:
-        return self.proxy_segment_api._delete(
-            collection_id, ids, where, where_document, tenant, database
+        return self.bindings.delete(
+            str(collection_id),
+            ids,
+            json.dumps(where) if where else None,
+            json.dumps(where_document) if where_document else None,
+            tenant,
+            database,
         )
+        # return self.proxy_segment_api._delete(
+        #     collection_id, ids, where, where_document, tenant, database
+        # )
 
     @override
     def reset(self) -> bool:

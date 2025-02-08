@@ -15,9 +15,12 @@ use chroma_sqlite::{config::SqliteDBConfig, db::SqliteDb};
 use chroma_sysdb::{sqlite::SqliteSysDb, sysdb::SysDb};
 use chroma_system::System;
 use chroma_types::{
-    Collection, CreateCollectionRequest, CreateDatabaseRequest, CreateTenantRequest, Database,
-    DeleteDatabaseRequest, GetDatabaseRequest, GetResponse, GetTenantRequest, GetTenantResponse,
-    HeartbeatError, IncludeList, ListDatabasesRequest, Metadata, QueryResponse, UpdateMetadata,
+    AddCollectionRecordsError, Collection, CreateCollectionRequest, CreateDatabaseRequest,
+    CreateTenantRequest, Database, DeleteCollectionRecordsResponse, DeleteDatabaseRequest,
+    GetCollectionError, GetDatabaseRequest, GetResponse, GetResponse, GetTenantRequest,
+    GetTenantResponse, HeartbeatError, IncludeList, IncludeList, ListDatabasesRequest, Metadata,
+    Metadata, QueryError, QueryResponse, QueryResponse, UpdateCollectionRecordsError,
+    UpdateMetadata, UpdateMetadata, UpsertCollectionRecordsError,
 };
 use numpy::PyReadonlyArray1;
 use pyo3::{pyclass, pymethods, PyObject, PyResult, Python};
@@ -363,7 +366,7 @@ impl Bindings {
         &self,
         collection_id: String,
         ids: Vec<String>,
-        embeddings: Option<Vec<PyReadonlyArray1<f32>>>,
+        embeddings: Option<Vec<Option<Vec<f32>>>>,
         metadatas: Option<Vec<Option<UpdateMetadata>>>,
         documents: Option<Vec<Option<String>>>,
         uris: Option<Vec<Option<String>>>,
@@ -372,12 +375,12 @@ impl Bindings {
     ) -> ChromaPyResult<bool> {
         let mut frontend_clone = self.frontend.clone();
 
-        let embeddings = match embeddings {
-            Some(embeddings) => {
-                py_embeddings_to_opt_vec_f32(Some(embeddings)).map_err(WrappedPyErr)?
-            }
-            None => None,
-        };
+        // let embeddings = match embeddings {
+        //     Some(embeddings) => {
+        //         py_embeddings_to_opt_vec_f32(Some(embeddings)).map_err(WrappedPyErr)?
+        //     }
+        //     None => None,
+        // };
 
         let collection_id = chroma_types::CollectionUuid(
             uuid::Uuid::parse_str(&collection_id).map_err(WrappedUuidError)?,
@@ -453,6 +456,119 @@ impl Bindings {
             .runtime
             .block_on(async { frontend_clone.get(request).await })?;
         Ok(result)
+    }
+
+    #[pyo3(
+            signature = (collection_id, ids = None, r#where = None, where_document = None, tenant = DEFAULT_TENANT.to_string(), database = DEFAULT_DATABASE.to_string())
+        )]
+    #[allow(clippy::too_many_arguments)]
+    fn delete(
+        &self,
+        collection_id: String,
+        ids: Option<Vec<String>>,
+        r#where: Option<String>,
+        where_document: Option<String>,
+        tenant: String,
+        database: String,
+    ) -> PyResult<()> {
+        // TODO: Rethink the error handling strategy
+        let r#where = chroma_types::RawWhereFields::from_json_str(
+            r#where.as_deref(),
+            where_document.as_deref(),
+        )
+        .map_err(|e| PyValueError::new_err(e.to_string()))?
+        .parse()
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+        let collection_id = chroma_types::CollectionUuid(
+            uuid::Uuid::parse_str(&collection_id)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+        );
+
+        let request = chroma_types::DeleteCollectionRecordsRequest::try_new(
+            tenant,
+            database,
+            collection_id,
+            ids,
+            r#where,
+        )
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+        let mut frontend_clone = self._frontend.clone();
+        self._runtime
+            .block_on(async { frontend_clone.delete(request).await })
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
+    #[pyo3(
+        signature = (collection_id, ids, embeddings = None, metadatas = None, documents = None, uris = None, tenant = DEFAULT_TENANT.to_string(), database = DEFAULT_DATABASE.to_string())
+    )]
+    #[allow(clippy::too_many_arguments)]
+    fn upsert(
+        &self,
+        collection_id: String,
+        ids: Vec<String>,
+        embeddings: Option<Vec<Vec<f32>>>,
+        metadatas: Option<Vec<Option<UpdateMetadata>>>,
+        documents: Option<Vec<Option<String>>>,
+        uris: Option<Vec<Option<String>>>,
+        tenant: String,
+        database: String,
+    ) -> PyResult<bool> {
+        let mut frontend_clone = self._frontend.clone();
+
+        // let embeddings = match embeddings {
+        //     Some(embeddings) => py_embeddings_to_opt_vec_f32(Some(embeddings))?,
+        //     None => None,
+        // };
+
+        let collection_id = chroma_types::CollectionUuid(
+            uuid::Uuid::parse_str(&collection_id)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+        );
+
+        let res = self._runtime.block_on(async {
+            frontend_clone
+                .validate_embedding(collection_id, embeddings.as_ref(), false, |e| Some(e.len()))
+                .await
+        });
+
+        // TODO: error handling
+        match res {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(PyRuntimeError::new_err(format!(
+                    "Failed to validate embeddings: {}",
+                    e
+                )))
+            }
+        }
+
+        let req = chroma_types::UpsertCollectionRecordsRequest::try_new(
+            tenant,
+            database,
+            collection_id,
+            ids,
+            embeddings,
+            documents,
+            uris,
+            metadatas,
+        )
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+        match self
+            ._runtime
+            .block_on(async { frontend_clone.upsert(req).await })
+        {
+            Ok(_) => Ok(true),
+            Err(e) => match e {
+                // TODO: How come this cannot throw collection not found?
+                UpsertCollectionRecordsError::Internal(e) => {
+                    Err(PyRuntimeError::new_err(format!("Internal Error: {}", e)))
+                }
+            },
+        }
     }
 
     #[pyo3(
