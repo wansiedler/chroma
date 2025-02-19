@@ -2,7 +2,13 @@ from dataclasses import dataclass
 from typing import (
     Any,
     Optional,
+    TypeVar,
+    Self,
 )
+from chromadb.api.types import EmbeddingFunction, Documents
+
+# Add imports and type variable
+T = TypeVar("T")
 
 
 @dataclass
@@ -20,19 +26,19 @@ class RuntimeConfigBuilder:
         self._batch_size: Optional[int] = None
         self._sync_threshold: Optional[int] = None
 
-    def with_num_threads(self, num_threads: int) -> "RuntimeConfigBuilder":
+    def with_num_threads(self, num_threads: int) -> Self:
         self._num_threads = num_threads
         return self
 
-    def with_resize_factor(self, resize_factor: float) -> "RuntimeConfigBuilder":
+    def with_resize_factor(self, resize_factor: float) -> Self:
         self._resize_factor = resize_factor
         return self
 
-    def with_batch_size(self, batch_size: int) -> "RuntimeConfigBuilder":
+    def with_batch_size(self, batch_size: int) -> Self:
         self._batch_size = batch_size
         return self
 
-    def with_sync_threshold(self, sync_threshold: int) -> "RuntimeConfigBuilder":
+    def with_sync_threshold(self, sync_threshold: int) -> Self:
         self._sync_threshold = sync_threshold
         return self
 
@@ -62,7 +68,7 @@ class HNSWConfigBuilder:
     def __init__(self) -> None:
         self._ef_search: Optional[int] = None
 
-    def with_ef_search(self, ef_search: int) -> "HNSWConfigBuilder":
+    def with_ef_search(self, ef_search: int) -> Self:
         self._ef_search = ef_search
         return self
 
@@ -88,19 +94,19 @@ class HNSWCreateConfigBuilder:
         self._ef_construction: Optional[int] = None
         self._max_neighbors: Optional[int] = None
 
-    def with_ef_search(self, ef_search: int) -> "HNSWCreateConfigBuilder":
+    def with_ef_search(self, ef_search: int) -> Self:
         self._ef_search = ef_search
         return self
 
-    def with_distance_metric(self, distance_metric: str) -> "HNSWCreateConfigBuilder":
+    def with_distance_metric(self, distance_metric: str) -> Self:
         self._distance_metric = distance_metric
         return self
 
-    def with_ef_construction(self, ef_construction: int) -> "HNSWCreateConfigBuilder":
+    def with_ef_construction(self, ef_construction: int) -> Self:
         self._ef_construction = ef_construction
         return self
 
-    def with_max_neighbors(self, max_neighbors: int) -> "HNSWCreateConfigBuilder":
+    def with_max_neighbors(self, max_neighbors: int) -> Self:
         self._max_neighbors = max_neighbors
         return self
 
@@ -125,27 +131,36 @@ class HNSWCreateConfigBuilder:
 class CreateCollectionConfig:
     hnsw: HNSWCreateConfig = HNSWCreateConfig()
     runtime: RuntimeConfig = RuntimeConfig()
+    embedding_function: Optional[EmbeddingFunction[Documents]] = None
 
 
 class CreateCollectionConfigBuilder:
     def __init__(self) -> None:
         self._hnsw_builder = HNSWCreateConfigBuilder()
         self._runtime_builder = RuntimeConfigBuilder()
+        self._embedding_function: Optional[EmbeddingFunction[Documents]] = None
 
-    def with_hnsw(self, **kwargs: Any) -> "CreateCollectionConfigBuilder":
+    def with_hnsw(self, **kwargs: Any) -> Self:
         for key, value in kwargs.items():
             getattr(self._hnsw_builder, f"with_{key}")(value)
         return self
 
-    def with_runtime(self, **kwargs: Any) -> "CreateCollectionConfigBuilder":
+    def with_runtime(self, **kwargs: Any) -> Self:
         for key, value in kwargs.items():
             getattr(self._runtime_builder, f"with_{key}")(value)
+        return self
+
+    def with_embedding_function(
+        self, embedding_function: EmbeddingFunction[Documents]
+    ) -> Self:
+        self._embedding_function = embedding_function
         return self
 
     def build(self) -> CreateCollectionConfig:
         return CreateCollectionConfig(
             hnsw=self._hnsw_builder.build(),
             runtime=self._runtime_builder.build(),
+            embedding_function=self._embedding_function,
         )
 
 
@@ -153,47 +168,65 @@ class CreateCollectionConfigBuilder:
 class UpdateCollectionConfig:
     hnsw: HNSWConfig = HNSWConfig()
     runtime: RuntimeConfig = RuntimeConfig()
+    embedding_function: Optional[EmbeddingFunction[Documents]] = None
 
 
 class UpdateCollectionConfigBuilder:
     def __init__(self) -> None:
         self._hnsw_builder = HNSWConfigBuilder()
         self._runtime_builder = RuntimeConfigBuilder()
+        self._embedding_function: Optional[EmbeddingFunction[Documents]] = None
 
-    def with_hnsw(self, **kwargs: Any) -> "UpdateCollectionConfigBuilder":
+    def with_hnsw(self, **kwargs: Any) -> Self:
         for key, value in kwargs.items():
             getattr(self._hnsw_builder, f"with_{key}")(value)
         return self
 
-    def with_runtime(self, **kwargs: Any) -> "UpdateCollectionConfigBuilder":
+    def with_runtime(self, **kwargs: Any) -> Self:
         for key, value in kwargs.items():
             getattr(self._runtime_builder, f"with_{key}")(value)
+        return self
+
+    def with_embedding_function(
+        self, embedding_function: EmbeddingFunction[Documents]
+    ) -> Self:
+        self._embedding_function = embedding_function
         return self
 
     def build(self) -> UpdateCollectionConfig:
         return UpdateCollectionConfig(
             hnsw=self._hnsw_builder.build(),
             runtime=self._runtime_builder.build(),
+            embedding_function=self._embedding_function,
         )
 
 
 @dataclass
 class QueryCollectionConfig:
     hnsw: HNSWConfig = HNSWConfig()
+    embedding_function: Optional[EmbeddingFunction[Documents]] = None
 
 
 class QueryCollectionConfigBuilder:
     def __init__(self) -> None:
         self._hnsw_builder = HNSWConfigBuilder()
+        self._embedding_function: Optional[EmbeddingFunction[Documents]] = None
 
-    def with_hnsw(self, **kwargs: Any) -> "QueryCollectionConfigBuilder":
+    def with_hnsw(self, **kwargs: Any) -> Self:
         for key, value in kwargs.items():
             getattr(self._hnsw_builder, f"with_{key}")(value)
+        return self
+
+    def with_embedding_function(
+        self, embedding_function: EmbeddingFunction[Documents]
+    ) -> Self:
+        self._embedding_function = embedding_function
         return self
 
     def build(self) -> QueryCollectionConfig:
         return QueryCollectionConfig(
             hnsw=self._hnsw_builder.build(),
+            embedding_function=self._embedding_function,
         )
 
 
