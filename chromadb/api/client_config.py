@@ -2,13 +2,9 @@ from dataclasses import dataclass
 from typing import (
     Any,
     Optional,
-    TypeVar,
     Self,
 )
 from chromadb.api.types import EmbeddingFunction, Documents
-
-# Add imports and type variable
-T = TypeVar("T")
 
 
 @dataclass
